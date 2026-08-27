@@ -1,0 +1,9 @@
+.git
+.venv
+.vscode
+.DS_Store
+.env
+__pycache__/
+*.pyc
+week1
+week2
