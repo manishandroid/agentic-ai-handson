@@ -6,7 +6,7 @@ class TextRequest(BaseModel):
     
 class TextResponse(BaseModel):
     task: str
-    results: str
+    result: str
     model: str
     tokens_used: Optional[int] = None
 
