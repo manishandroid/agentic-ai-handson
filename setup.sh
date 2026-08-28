@@ -34,27 +34,28 @@ sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -aG docker $USER
 
-echo "[3/4] Building the AI Workbench container..."
-# Context is the project root because the Dockerfile copies the shared requirements.txt.
-sudo docker build -f week3/backend/Dockerfile -t ai-workbench-api .
+echo "[3/4] Installing the Docker Compose plugin..."
+# Amazon Linux 2023 ships Docker without the compose plugin, so fetch it directly.
+if ! sudo docker compose version &> /dev/null; then
+    sudo mkdir -p /usr/local/lib/docker/cli-plugins
+    sudo curl -fsSL \
+        "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+        -o /usr/local/lib/docker/cli-plugins/docker-compose
+    sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+fi
 
-echo "[4/4] Running the container..."
+echo "[4/4] Building and starting backend + frontend..."
 sudo docker rm -f ai-workbench 2>/dev/null || true
-sudo docker run -d \
-    --name ai-workbench \
-    --restart unless-stopped \
-    -p 8000:8000 \
-    --env-file .env \
-    ai-workbench-api
+sudo docker compose up -d --build
+
+PUBLIC_IP=$(curl -fsS --max-time 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "<YOUR-EC2-PUBLIC-IP>")
 
 echo ""
 echo "=== Setup Complete ==="
-echo "Your AI Workbench API is running on port 8000."
+echo "API      : http://${PUBLIC_IP}:8000"
+echo "Frontend : http://${PUBLIC_IP}:8501"
 echo ""
-echo "Test it:"
+echo "Test the API locally:"
 echo "  curl http://localhost:8000/health"
 echo ""
-echo "From outside (use your EC2 public IP):"
-echo "  curl http://<YOUR-EC2-PUBLIC-IP>:8000/health"
-echo ""
-echo "Make sure your Security Group allows inbound TCP on port 8000."
+echo "Make sure your Security Group allows inbound TCP on ports 8000 and 8501."
