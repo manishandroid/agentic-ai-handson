@@ -34,14 +34,35 @@ sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -aG docker $USER
 
-echo "[3/4] Installing the Docker Compose plugin..."
-# Amazon Linux 2023 ships Docker without the compose plugin, so fetch it directly.
+echo "[3/4] Installing Docker CLI plugins (compose + buildx)..."
+# Amazon Linux 2023 ships Docker without the compose and buildx plugins, so fetch them directly.
+PLUGIN_DIR=/usr/local/lib/docker/cli-plugins
+sudo mkdir -p "$PLUGIN_DIR"
+
+case "$(uname -m)" in
+    x86_64)  BUILDX_ARCH=amd64 ;;
+    aarch64) BUILDX_ARCH=arm64 ;;
+    *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
+
 if ! sudo docker compose version &> /dev/null; then
-    sudo mkdir -p /usr/local/lib/docker/cli-plugins
     sudo curl -fsSL \
         "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
-        -o /usr/local/lib/docker/cli-plugins/docker-compose
-    sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+        -o "$PLUGIN_DIR/docker-compose"
+    sudo chmod +x "$PLUGIN_DIR/docker-compose"
+fi
+
+# "compose build" delegates to buildx and rejects anything older than 0.17.0.
+BUILDX_HAVE=$(sudo docker buildx version 2>/dev/null | awk '{print $2}' | tr -d 'v')
+if [ -z "$BUILDX_HAVE" ] || [ "$(printf '%s\n0.17.0\n' "$BUILDX_HAVE" | sort -V | head -1)" != "0.17.0" ]; then
+    # The API is unauthenticated here and can be rate-limited, so fall back to a known-good tag.
+    BUILDX_TAG=$(curl -fsSL https://api.github.com/repos/docker/buildx/releases/latest 2>/dev/null \
+        | grep -m1 '"tag_name"' | cut -d'"' -f4)
+    BUILDX_TAG=${BUILDX_TAG:-v0.36.1}
+    sudo curl -fsSL \
+        "https://github.com/docker/buildx/releases/download/${BUILDX_TAG}/buildx-${BUILDX_TAG}.linux-${BUILDX_ARCH}" \
+        -o "$PLUGIN_DIR/docker-buildx"
+    sudo chmod +x "$PLUGIN_DIR/docker-buildx"
 fi
 
 echo "[4/4] Building and starting backend + frontend..."
