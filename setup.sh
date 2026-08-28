@@ -5,8 +5,15 @@
 
 set -e
 
+cd "$(dirname "$0")"
+
 echo "=== AI Workbench EC2 Setup ==="
 echo ""
+
+if [ ! -f .env ]; then
+    echo "Missing .env — copy .env.example to .env and fill in OPENAI_API_KEY."
+    exit 1
+fi
 
 # Detect OS and install Docker
 if command -v dnf &> /dev/null; then
@@ -28,11 +35,11 @@ sudo systemctl enable docker
 sudo usermod -aG docker $USER
 
 echo "[3/4] Building the AI Workbench container..."
-cd week3/backend
-sudo docker build -t ai-workbench-api .
-cd ..
+# Context is the project root because the Dockerfile copies the shared requirements.txt.
+sudo docker build -f week3/backend/Dockerfile -t ai-workbench-api .
 
 echo "[4/4] Running the container..."
+sudo docker rm -f ai-workbench 2>/dev/null || true
 sudo docker run -d \
     --name ai-workbench \
     --restart unless-stopped \
