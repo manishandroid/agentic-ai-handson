@@ -28,7 +28,7 @@ sudo systemctl enable docker
 sudo usermod -aG docker $USER
 
 echo "[3/4] Building the AI Workbench container..."
-cd backend
+cd week3/backend
 sudo docker build -t ai-workbench-api .
 cd ..
 
